@@ -12,9 +12,6 @@ class app():
         self.root = os.getcwd()
         self.main()
 
-    #NOTES
-    #loops with folder in folder
-
     def filter(self, name, ext):
         if (ext in self.filters): pass
         elif name.lower() == ext and name not in self.filters: self.main(ext)
@@ -81,4 +78,5 @@ class app():
 
 if __name__ == "__main__":
     app()
+    
 #this section above can be modified to find different elements from different websites
