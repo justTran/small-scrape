@@ -1,71 +1,84 @@
 from bs4 import BeautifulSoup
-import importlib, requests, urllib, os, time, sys, re
+import importlib, requests, urllib, os, time, sys, re, math
 
-hdr = {"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/77.0.3865.42 Safari/537.36 Edg/77.0.235.17"}
-filters = {'http://www.directorylister.com', 'None', '..', 'javascript:void(0)', '[To Parent Directory]', '/cdn-cgi/l/email-protection', '/'}
-files = {'jpg', 'jpeg', 'png', 'flac', 'mkv', 'exe', 'f4v', 'mp4', 'wmv', 'txt', 'iso', 'zip', 'rar', 'bmp'}
-badfiles = {'.url', '.nfo'}
-site = 'http://misc.wirbelwind.ws/'
-root = os.getcwd()
 
-def filter(name, ext):
-    if (ext in filters): pass
-    elif name == ext and name not in filters: main(ext)
-    elif (ext in badfiles): pass
-    elif (ext in files): getFiles(name, ext)
-    return
+class app():
 
-def checkPath(path):
-    if os.path.exists(root + path): return (root + path)
-    elif not os.path.exists(root + path):
-        try: 
-            child = (os.getcwd() + '\\' + path).replace('/', "")
-            os.mkdir(child)
-        except:
-            pass
+    def __init__(self):
+        self.hdr = {"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/77.0.3865.42 Safari/537.36 Edg/77.0.235.17"}
+        self.filters = {'http://www.directorylister.com', 'None', '..', 'javascript:void(0)', '[To Parent Directory]', '/cdn-cgi/l/email-protection', '/', 'aspnet_client'}
+        self.files = {'jpg', 'jpeg', 'png', 'flac', 'mkv', 'exe', 'f4v', 'mp4', 'wmv', 'txt', 'iso', 'zip', 'rar', 'bmp', 'pdf'}
+        self.site = 'http://misc.wirbelwind.ws/'
+        self.root = os.getcwd()
+        self.main()
 
-    return str(child)
+    #NOTES
+    #loops with folder in folder
 
-def getFolder(site, soup):
-    for j in soup.find_all('a'):
-        parsed = str(j.get('href')).split('.')
-        name = ''.join(parsed[:1])
-        ext = parsed[-1].lower()
-        filter(name, ext)
-    return
+    def filter(self, name, ext):
+        if (ext in self.filters): pass
+        elif name.lower() == ext and name not in self.filters: self.main(ext)
+        elif (ext in self.files): self.getFiles(name, ext)
+        return
 
-def getFiles(name, ext):
-    print(f"/nCurrent directory is: {os.getcwd()}")
-    fi = name + '.' + ext
-    with open(root + fi, 'wb') as f: #DOWNLOADS FILE
-        print (f"\nDownloading {name}.{ext}")
-        response = requests.get(site + fi, stream = True)
-        total_length = response.headers.get('content-length')
+    def checkPath(self, path):
+        if os.path.exists(self.root + path): return (self.root + path)
+        elif not os.path.exists(self.root + path):
+            try: 
+                child = (os.getcwd() + '\\' + path).replace('/', '\\').replace('\\\\', '\\')
+                os.mkdir(child)
+            except:
+                pass
 
-        if total_length is None:
-            f.write(response.content)
+        return str(child)
 
+    def getFolder(self, site, soup):
+        links = soup.find_all('a')
+        if len(links[0].get('href')) > 1: links.pop(0)
+        for j in links:
+            parsed = str(j.get('href')).split('.')
+            if len(parsed) == 1: name = parsed[0]
+            else: name = '.'.join(parsed[:-1])
+            ext = parsed[-1].lower()
+            self.filter(name, ext)
+        return
+
+    def getFiles(self, name, ext):
+        print(f"\nCurrent directory is: {os.getcwd()}")
+
+        fi = name + '.' + ext
+        if not os.path.exists(self.root + fi):
+            with open(self.root + fi, 'wb') as f: #DOWNLOADS FILE
+                print (f"\nDownloading {name}.{ext}")
+                response = requests.get(self.site + fi, stream = True)
+                total_length = response.headers.get('content-length')
+
+                if total_length is None:
+                    f.write(response.content)
+
+                else:
+                    dl = 0
+                    total_length = int(total_length)
+                    for data in response.iter_content(chunk_size = int(math.ceil(total_length / 100))):
+                        dl += len(data)
+                        f.write(data)
+                        done = int(25 * dl / total_length)
+                        sys.stdout.write("\r[%s%s]" % ('~' * done, ' ' * (25-done)))    
+                        sys.stdout.flush()
         else:
-            dl = 0
-            total_length = int(total_length)
-            for data in response.iter_content(chunk_size = int(total_length / 100)):
-                dl += len(data)
-                f.write(data)
-                done = int(25 * dl / total_length)
-                sys.stdout.write("\r[%s%s]" % ('~' * done, ' ' * (25-done)))    
-                sys.stdout.flush()
+            print((f"\nSkipping {name}.{ext}"))
 
-def main(ext = ""):
-    if ext: 
-        os.chdir(root)
-        print(f"Traversing into {ext}.")
-        os.chdir(checkPath(ext))
+    def main(self, ext = ""):
+        if ext:
+            os.chdir(self.root)
+            print(f"\nTraversing into {ext}.")
+            os.chdir(self.checkPath(ext))
 
-    req = requests.get(site + ext, headers = hdr)
-    soup = BeautifulSoup(req.text, 'html.parser')
-    getFolder(site + ext, soup)
-    return
+        req = requests.get(self.site + ext, headers = self.hdr)
+        soup = BeautifulSoup(req.text, 'html.parser')
+        self.getFolder(self.site + ext, soup)
+        return
 
 if __name__ == "__main__":
-    main()
+    app()
 #this section above can be modified to find different elements from different websites
